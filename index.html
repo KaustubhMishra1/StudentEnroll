@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Enrollment Form</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f4f8; display: flex; justify-content: center; padding: 40px; }
+    .form-box { background: white; padding: 30px; border-radius: 10px; width: 520px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h2 { color: #2c3e50; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #999; margin-bottom: 20px; }
+    label { display: block; margin-top: 14px; font-size: 13px; color: #555; font-weight: bold; }
+    input, textarea { width: 100%; padding: 8px 10px; margin-top: 4px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    input:disabled, textarea:disabled { background: #f5f5f5; cursor: not-allowed; color: #aaa; }
+    .roll-row { display: flex; gap: 8px; margin-top: 4px; }
+    .roll-row input { flex: 1; margin-top: 0; }
+    .roll-row button { padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .btn-row { margin-top: 24px; display: flex; gap: 10px; }
+    .btn-row button { padding: 9px 22px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold; }
+    .btn-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #btnSave { background: #27ae60; color: white; }
+    #btnUpdate { background: #e67e22; color: white; }
+    #btnReset { background: #95a5a6; color: white; }
+    #statusMsg { margin-top: 16px; padding: 10px 14px; border-radius: 6px; font-size: 13px; display: none; }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+  </style>
+</head>
+<body>
+<div class="form-box">
+  <h2>Student Enrollment Form</h2>
+  <p class="subtitle">STUDENT-TABLE · SCHOOL-DB</p>
+
+  <label>Roll No. (Primary Key)</label>
+  <div class="roll-row">
+    <input type="text" id="rollNo" placeholder="Enter Roll No.">
+    <button onclick="checkRollNo()">Check</button>
+  </div>
+
+  <label>Full Name</label>
+  <input type="text" id="fullName" placeholder="Student full name" disabled>
+
+  <label>Class</label>
+  <input type="text" id="class" placeholder="e.g. 10-A" disabled>
+
+  <label>Birth Date</label>
+  <input type="date" id="birthDate" disabled>
+
+  <label>Address</label>
+  <textarea id="address" rows="3" placeholder="Full address" disabled></textarea>
+
+  <label>Enrollment Date</label>
+  <input type="date" id="enrollDate" disabled>
+
+  <div class="btn-row">
+    <button id="btnSave" onclick="saveData()" disabled>Save</button>
+    <button id="btnUpdate" onclick="updateData()" disabled>Update</button>
+    <button id="btnReset" onclick="resetForm()" disabled>Reset</button>
+  </div>
+
+  <div id="statusMsg"></div>
+</div>
+
+<script>
+  var connToken = "90935216|-31949242265593292|90958356";
+  var baseUrl = "http://api.login2explore.com:5577";
+  var dbName = "SCHOOL-DB";
+  var relName = "STUDENT-TABLE";
+  var recNo = -1;
+
+  function showStatus(msg, type) {
+    $("#statusMsg").removeClass("success error info").addClass(type).text(msg).show();
+  }
+
+  function hideStatus() {
+    $("#statusMsg").hide().text("");
+  }
+
+  function resetForm() {
+    recNo = -1;
+    $("#rollNo").val("").prop("disabled", false);
+    $("#fullName, #class, #birthDate, #address, #enrollDate").val("").prop("disabled", true);
+    $("#btnSave, #btnUpdate, #btnReset").prop("disabled", true);
+    hideStatus();
+    setTimeout(function() { $("#rollNo").focus(); }, 50);
+  }
+
+  function enableSave() {
+    $("#fullName, #class, #birthDate, #address, #enrollDate").prop("disabled", false);
+    $("#btnSave, #btnReset").prop("disabled", false);
+    $("#btnUpdate").prop("disabled", true);
+    setTimeout(function() { $("#fullName").focus(); }, 50);
+  }
+
+  function enableUpdate() {
+    $("#rollNo").prop("disabled", true);
+    $("#fullName, #class, #birthDate, #address, #enrollDate").prop("disabled", false);
+    $("#btnUpdate, #btnReset").prop("disabled", false);
+    $("#btnSave").prop("disabled", true);
+    setTimeout(function() { $("#fullName").focus(); }, 50);
+  }
+
+  function validateForm() {
+    if (!$("#fullName").val().trim()) { showStatus("Full Name is required.", "error"); return false; }
+    if (!$("#class").val().trim()) { showStatus("Class is required.", "error"); return false; }
+    if (!$("#birthDate").val()) { showStatus("Birth Date is required.", "error"); return false; }
+    if (!$("#address").val().trim()) { showStatus("Address is required.", "error"); return false; }
+    if (!$("#enrollDate").val()) { showStatus("Enrollment Date is required.", "error"); return false; }
+    return true;
+  }
+
+  function jpdbPost(reqBody, endpoint, successCallback) {
+    $.ajax({
+      url: baseUrl + endpoint,
+      type: "POST",
+      data: reqBody,
+      contentType: "application/json",
+      success: function(response) {
+        var result = (typeof response === "string") ? JSON.parse(response) : response;
+        successCallback(result);
+      },
+      error: function(xhr) {
+        var result = (typeof xhr.responseText === "string") ? JSON.parse(xhr.responseText) : xhr.responseText;
+        successCallback(result);
+      }
+    });
+  }
+
+  function checkRollNo() {
+    var rno = $("#rollNo").val().trim();
+    if (!rno) { showStatus("Please enter a Roll No. first.", "error"); return; }
+    showStatus("Checking...", "info");
+
+    var reqBody = JSON.stringify({
+      "token": connToken,
+      "cmd": "GET_BY_KEY",
+      "dbName": dbName,
+      "rel": relName,
+      "jsonStr": { "Roll-No": rno }
+    });
+
+    jpdbPost(reqBody, "/api/irl", function(result) {
+      if (result.status === 400) {
+        showStatus("New Roll No. — fill details and click Save.", "info");
+        enableSave();
+      } else if (result.status === 200) {
+        var data = JSON.parse(result.data).record;
+        recNo = JSON.parse(result.data).rec_no;
+        $("#fullName").val(data["Full-Name"]);
+        $("#class").val(data["Class"]);
+        $("#birthDate").val(data["Birth-Date"]);
+        $("#address").val(data["Address"]);
+        $("#enrollDate").val(data["Enrollment-Date"]);
+        showStatus("Record found — modify and click Update.", "info");
+        enableUpdate();
+      } else {
+        showStatus("Error " + result.status + ": " + result.message, "error");
+      }
+    });
+  }
+
+  function saveData() {
+    if (!validateForm()) return;
+
+    var reqBody = JSON.stringify({
+      "token": connToken,
+      "cmd": "PUT",
+      "dbName": dbName,
+      "rel": relName,
+      "jsonStr": {
+        "Roll-No": $("#rollNo").val().trim(),
+        "Full-Name": $("#fullName").val().trim(),
+        "Class": $("#class").val().trim(),
+        "Birth-Date": $("#birthDate").val(),
+        "Address": $("#address").val().trim(),
+        "Enrollment-Date": $("#enrollDate").val()
+      }
+    });
+
+    jpdbPost(reqBody, "/api/iml", function(result) {
+      if (result.status === 200) {
+        showStatus("Student saved successfully!", "success");
+        setTimeout(resetForm, 1500);
+      } else {
+        showStatus("Save error: " + result.message, "error");
+      }
+    });
+  }
+
+  function updateData() {
+    if (!validateForm()) return;
+
+    var reqBody = JSON.stringify({
+      "token": connToken,
+      "cmd": "UPDATE",
+      "dbName": dbName,
+      "rel": relName,
+      "record": recNo,
+      "jsonStr": {
+        "Full-Name": $("#fullName").val().trim(),
+        "Class": $("#class").val().trim(),
+        "Birth-Date": $("#birthDate").val(),
+        "Address": $("#address").val().trim(),
+        "Enrollment-Date": $("#enrollDate").val()
+      }
+    });
+
+    jpdbPost(reqBody, "/api/iml", function(result) {
+      if (result.status === 200) {
+        showStatus("Student updated successfully!", "success");
+        setTimeout(resetForm, 1500);
+      } else {
+        showStatus("Update error: " + result.message, "error");
+      }
+    });
+  }
+
+  $(document).ready(function() { resetForm(); });
+</script>
+</body>
+</html>
