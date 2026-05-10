@@ -17,8 +17,6 @@ A system to manage student enrollment efficiently.
 1. Clone the repo
 2. Run the project
 
-## 📷 Screenshots
-(Add images if possible)
 
 ## 👨‍💻 Author
 Kaustubh Mishra
